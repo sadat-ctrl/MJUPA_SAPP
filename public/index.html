@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZanaChat</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+:root{--bg:#0a0e1a;--sidebar:#0f1525;--chat-bg:#080c18;--surface:#151d35;--surface2:#1c2640;--accent:#4f9cf9;--accent2:#7c3aed;--green:#22d3a5;--red:#f43f5e;--text:#e8eaf6;--text2:#8892b0;--border:rgba(255,255,255,0.07);--msg-out:#1a3a6e;--msg-in:#151d35;--radius:16px;--shadow:0 8px 32px rgba(0,0,0,0.4)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+#auth-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:100}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px;width:100%;max-width:420px;box-shadow:var(--shadow);animation:slideUp 0.4s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+.auth-logo{text-align:center;margin-bottom:36px}
+.auth-logo h1{font-family:'Sora',sans-serif;font-size:2rem;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.auth-logo p{color:var(--text2);margin-top:4px;font-size:0.9rem}
+.auth-tabs{display:flex;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:28px}
+.auth-tab{flex:1;padding:10px;background:none;border:none;color:var(--text2);cursor:pointer;border-radius:10px;font-family:inherit;font-size:0.9rem;font-weight:600;transition:all 0.2s}
+.auth-tab.active{background:var(--surface2);color:var(--accent)}
+.input-group{margin-bottom:16px}
+.input-group label{display:block;font-size:0.8rem;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em}
+.input-group input{width:100%;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:inherit;font-size:0.95rem;transition:border-color 0.2s;outline:none}
+.input-group input:focus{border-color:var(--accent)}
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:12px;color:white;font-family:inherit;font-size:1rem;font-weight:600;cursor:pointer;transition:opacity 0.2s,transform 0.1s;margin-top:8px}
+.btn-primary:hover{opacity:0.9;transform:translateY(-1px)}
+.auth-error{background:rgba(244,63,94,0.1);border:1px solid rgba(244,63,94,0.3);color:var(--red);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:0.85rem;display:none}
+#app{display:none;height:100vh;flex-direction:row}
+#app.visible{display:flex}
+.sidebar{width:360px;min-width:360px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh}
+.sidebar-header{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.my-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;cursor:pointer;overflow:hidden;flex-shrink:0}
+.my-avatar img{width:100%;height:100%;object-fit:cover}
+.sidebar-header-info{flex:1}
+.sidebar-header-info h3{font-size:0.95rem;font-weight:600}
+.sidebar-header-info p{font-size:0.75rem;color:var(--text2)}
+.header-actions{display:flex;gap:8px}
+.icon-btn{width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all 0.2s;font-size:1rem}
+.icon-btn:hover{background:var(--surface2);color:var(--accent)}
+.search-bar{padding:12px 16px;border-bottom:1px solid var(--border)}
+.search-bar input{width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:inherit;font-size:0.85rem;outline:none;transition:border-color 0.2s}
+.search-bar input:focus{border-color:var(--accent)}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border)}
+.sidebar-tab{flex:1;padding:12px 8px;background:none;border:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:0.8rem;font-weight:600;border-bottom:2px solid transparent;transition:all 0.2s}
+.sidebar-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.rooms-list{flex:1;overflow-y:auto;padding:8px}
+.rooms-list::-webkit-scrollbar{width:4px}
+.rooms-list::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px}
+.room-item{padding:12px 14px;border-radius:14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:background 0.15s}
+.room-item:hover{background:var(--surface)}
+.room-item.active{background:var(--surface2)}
+.room-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;overflow:hidden;flex-shrink:0;position:relative}
+.room-avatar img{width:100%;height:100%;object-fit:cover}
+.online-dot{position:absolute;bottom:2px;right:2px;width:12px;height:12px;background:var(--green);border-radius:50%;border:2px solid var(--sidebar)}
+.room-info{flex:1;min-width:0}
+.room-name{font-size:0.9rem;font-weight:600;margin-bottom:3px}
+.room-preview{font-size:0.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.room-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.room-time{font-size:0.7rem;color:var(--text2)}
+.chat-area{flex:1;display:flex;flex-direction:column;background:var(--chat-bg);position:relative}
+.chat-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text2);text-align:center;padding:40px}
+.chat-placeholder .logo-big{font-family:'Sora',sans-serif;font-size:3rem;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
+.chat-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;background:var(--sidebar);position:relative;z-index:1}
+.chat-header-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden}
+.chat-header-avatar img{width:100%;height:100%;object-fit:cover}
+.chat-header-info{flex:1}
+.chat-header-info h3{font-size:0.95rem;font-weight:600}
+.chat-header-info p{font-size:0.75rem;color:var(--text2)}
+.chat-header-info p.online{color:var(--green)}
+.messages-container{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:4px;position:relative;z-index:1}
+.messages-container::-webkit-scrollbar{width:4px}
+.messages-container::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px}
+.message{display:flex;max-width:70%;animation:msgIn 0.2s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.message.outgoing{align-self:flex-end;flex-direction:row-reverse}
+.message.incoming{align-self:flex-start}
+.msg-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0;margin-top:auto;overflow:hidden}
+.msg-avatar img{width:100%;height:100%;object-fit:cover}
+.message.outgoing .msg-avatar{margin-left:8px}
+.message.incoming .msg-avatar{margin-right:8px}
+.msg-bubble{padding:10px 14px;border-radius:18px;max-width:100%}
+.message.outgoing .msg-bubble{background:var(--msg-out);border-bottom-right-radius:4px}
+.message.incoming .msg-bubble{background:var(--msg-in);border-bottom-left-radius:4px}
+.msg-sender{font-size:0.72rem;font-weight:600;color:var(--accent);margin-bottom:3px}
+.msg-text{font-size:0.88rem;line-height:1.5;word-break:break-word}
+.msg-image{max-width:240px;border-radius:12px;cursor:pointer;display:block}
+.msg-time{font-size:0.65rem;color:var(--text2);margin-top:4px;text-align:right}
+.typing-indicator{align-self:flex-start;background:var(--msg-in);padding:10px 16px;border-radius:18px;border-bottom-left-radius:4px;display:none;align-items:center;gap:4px;font-size:0.75rem;color:var(--text2)}
+.typing-indicator.visible{display:flex}
+.typing-dots span{display:inline-block;width:6px;height:6px;background:var(--text2);border-radius:50%;animation:bounce 1.2s infinite}
+.typing-dots span:nth-child(2){animation-delay:0.2s}
+.typing-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.input-area{padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:10px;background:var(--sidebar);position:relative;z-index:1}
+.attach-btn{width:42px;height:42px;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:1.2rem;transition:all 0.2s;flex-shrink:0}
+.attach-btn:hover{background:var(--surface2);color:var(--accent)}
+.message-input-wrapper{flex:1;position:relative}
+#message-input{width:100%;min-height:42px;max-height:120px;padding:11px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;color:var(--text);font-family:inherit;font-size:0.9rem;outline:none;resize:none;transition:border-color 0.2s;line-height:1.4}
+#message-input:focus{border-color:var(--accent)}
+#message-input::placeholder{color:var(--text2)}
+.send-btn{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:12px;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:opacity 0.2s,transform 0.1s;flex-shrink:0}
+.send-btn:hover{opacity:0.9;transform:scale(1.05)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.modal-overlay.visible{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;width:100%;max-width:400px;box-shadow:var(--shadow);animation:slideUp 0.3s ease}
+.modal h2{font-family:'Sora',sans-serif;margin-bottom:20px;font-size:1.2rem}
+.modal-footer{display:flex;gap:10px;margin-top:20px}
+.btn-secondary{flex:1;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-family:inherit;font-size:0.9rem;cursor:pointer}
+.btn-primary-sm{flex:1;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;color:white;font-family:inherit;font-size:0.9rem;font-weight:600;cursor:pointer}
+.notification{position:fixed;top:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 18px;box-shadow:var(--shadow);z-index:300;display:flex;align-items:center;gap:12px;transform:translateX(200%);transition:transform 0.3s ease;max-width:300px}
+.notification.show{transform:translateX(0)}
+.notification-title{font-weight:600;margin-bottom:2px}
+.notification-msg{color:var(--text2);font-size:0.85rem}
+.checkbox-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;cursor:pointer;transition:background 0.15s}
+.checkbox-item:hover{background:var(--bg)}
+.checkbox-item input{width:16px;height:16px;accent-color:var(--accent)}
+#file-input{display:none}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text2);font-size:0.85rem}
+.back-btn{display:none;width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;align-items:center;justify-content:center;color:var(--text2);font-size:1.1rem}
+@media(max-width:768px){.sidebar{width:100%;min-width:100%}.chat-area{display:none;position:fixed;inset:0;z-index:50}.chat-area.mobile-open{display:flex}.back-btn{display:flex!important}}
+</style>
+</head>
+<body>
+<div id="auth-screen">
+<div class="auth-box">
+<div class="auth-logo"><h1>ZanaChat</h1><p>Ongea na marafiki kwa wakati halisi</p></div>
+<div class="auth-tabs">
+<button class="auth-tab active" onclick="switchTab('login')">Ingia</button>
+<button class="auth-tab" onclick="switchTab('register')">Jiandikishe</button>
+</div>
+<div id="auth-error" class="auth-error"></div>
+<div id="login-form">
+<div class="input-group"><label>Jina la Mtumiaji</label><input type="text" id="login-username" placeholder="Jina lako..."></div>
+<div class="input-group"><label>Nywila</label><input type="password" id="login-password" placeholder="Nywila yako..."></div>
+<button class="btn-primary" onclick="login()">Ingia</button>
+</div>
+<div id="register-form" style="display:none">
+<div class="input-group"><label>Jina la Mtumiaji</label><input type="text" id="reg-username" placeholder="Chagua jina..."></div>
+<div class="input-group"><label>Nywila</label><input type="password" id="reg-password" placeholder="Nywila (herufi 6+)..."></div>
+<button class="btn-primary" onclick="register()">Jiandikishe</button>
+</div>
+</div>
+</div>
+<div id="app">
+<div class="sidebar">
+<div class="sidebar-header">
+<div class="my-avatar" id="my-avatar" onclick="openProfileModal()"><span id="my-avatar-text">?</span></div>
+<div class="sidebar-header-info"><h3 id="my-username">...</h3><p id="my-status">Habari!</p></div>
+<div class="header-actions">
+<button class="icon-btn" onclick="openGroupModal()">👥</button>
+<button class="icon-btn" onclick="logout()">🚪</button>
+</div>
+</div>
+<div class="search-bar"><input type="text" id="search-input" placeholder="🔍 Tafuta..." oninput="filterRooms()"></div>
+<div class="sidebar-tabs">
+<button class="sidebar-tab active" onclick="showTab('chats')">💬 Mazungumzo</button>
+<button class="sidebar-tab" onclick="showTab('users')">👤 Watu</button>
+</div>
+<div id="chats-panel" class="rooms-list" style="flex:1;overflow-y:auto;"></div>
+<div id="users-panel" style="flex:1;overflow-y:auto;display:none;padding:8px;"></div>
+</div>
+<div class="chat-area" id="chat-area">
+<div class="chat-placeholder" id="chat-placeholder"><div class="logo-big">ZanaChat</div><p>Chagua mazungumzo kuanza</p></div>
+<div id="active-chat" style="display:none;flex:1;flex-direction:column;">
+<div class="chat-header">
+<button class="back-btn" onclick="closeChat()">←</button>
+<div class="chat-header-avatar" id="chat-avatar">?</div>
+<div class="chat-header-info"><h3 id="chat-name">...</h3><p id="chat-status">...</p></div>
+</div>
+<div class="messages-container" id="messages-container">
+<div class="typing-indicator" id="typing-indicator"><span id="typing-name"></span><div class="typing-dots"><span></span><span></span><span></span></div></div>
+</div>
+<div class="input-area">
+<button class="attach-btn" onclick="document.getElementById('file-input').click()">📎</button>
+<input type="file" id="file-input" accept="image/*" onchange="sendImage(this)">
+<div class="message-input-wrapper"><textarea id="message-input" placeholder="Andika ujumbe..." rows="1" onkeydown="handleKeyDown(event)" oninput="handleTyping()"></textarea></div>
+<button class="send-btn" onclick="sendMessage()">➤</button>
+</div>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="group-modal">
+<div class="modal">
+<h2>👥 Unda Kikundi</h2>
+<div class="input-group"><label>Jina la Kikundi</label><input type="text" id="group-name" placeholder="Mfano: Familia..."></div>
+<div style="margin-top:12px;"><label style="font-size:0.8rem;color:var(--text2);font-weight:600;">Weka Wanachama</label><div id="group-users-list" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div></div>
+<div class="modal-footer"><button class="btn-secondary" onclick="closeGroupModal()">Ghairi</button><button class="btn-primary-sm" onclick="createGroup()">Unda</button></div>
+</div>
+</div>
+<div class="modal-overlay" id="profile-modal">
+<div class="modal">
+<h2>👤 Wasifu Wangu</h2>
+<div class="input-group"><label>Hali Yangu</label><input type="text" id="status-input" placeholder="Andika hali yako..."></div>
+<div class="modal-footer"><button class="btn-secondary" onclick="closeProfileModal()">Funga</button><button class="btn-primary-sm" onclick="saveProfile()">Hifadhi</button></div>
+</div>
+</div>
+<div class="notification" id="notification">
+<div>💬</div>
+<div><div class="notification-title" id="notif-title"></div><div class="notification-msg" id="notif-msg"></div></div>
+</div>
+<script>
+let token=localStorage.getItem('token');
+let currentUser=JSON.parse(localStorage.getItem('user')||'null');
+let socket=null,currentRoomId=null,allRooms=[],allUsers=[],typingTimeout=null,onlineUserIds=new Set();
+
+function switchTab(tab){
+document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(i===0)===(tab==='login')));
+document.getElementById('login-form').style.display=tab==='login'?'block':'none';
+document.getElementById('register-form').style.display=tab==='register'?'block':'none';
+document.getElementById('auth-error').style.display='none';
+}
+
+function showError(msg){const el=document.getElementById('auth-error');el.textContent=msg;el.style.display='block';}
+
+async function login(){
+const username=document.getElementById('login-username').value.trim();
+const password=document.getElementById('login-password').value;
+if(!username||!password)return showError('Jaza taarifa zote');
+try{const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+const data=await res.json();if(!res.ok)return showError(data.error);saveAuth(data);}
+catch{showError('Hitilafu ya mtandao');}
+}
+
+async function register(){
+const username=document.getElementById('reg-username').value.trim();
+const password=document.getElementById('reg-password').value;
+if(!username||!password)return showError('Jaza taarifa zote');
+try{const res=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+const data=await res.json();if(!res.ok)return showError(data.error);saveAuth(data);}
+catch{showError('Hitilafu ya mtandao');}
+}
+
+function saveAuth(data){token=data.token;currentUser=data.user;localStorage.setItem('token',token);localStorage.setItem('user',JSON.stringify(currentUser));initApp();}
+function logout(){localStorage.clear();location.reload();}
+
+function initApp(){
+document.getElementById('auth-screen').style.display='none';
+document.getElementById('app').classList.add('visible');
+document.getElementById('my-username').textContent=currentUser.username;
+document.getElementById('my-status').textContent=currentUser.status||'Habari!';
+document.getElementById('my-avatar-text').textContent=currentUser.username[0].toUpperCase();
+connectSocket();loadRooms();loadUsers();
+}
+
+function connectSocket(){
+socket=io({auth:{token}});
+socket.on('new_message',(msg)=>{
+if(msg.room_id===currentRoomId){appendMessage(msg);socket.emit('mark_read',{room_id:currentRoomId});}
+else if(msg.sender_id!==currentUser.id)showNotification(msg.username,msg.type==='text'?msg.content:'📷 Picha');
+updateRoomPreview(msg);
+});
+socket.on('user_typing',({user_id,username,is_typing})=>{
+if(user_id===currentUser.id)return;
+const el=document.getElementById('typing-indicator');
+document.getElementById('typing-name').textContent=username+' anaandika';
+el.classList.toggle('visible',is_typing);
+});
+socket.on('user_online',({user_id})=>{onlineUserIds.add(user_id);updateOnlineStatus(user_id,true);});
+socket.on('user_offline',({user_id})=>{onlineUserIds.delete(user_id);updateOnlineStatus(user_id,false);});
+}
+
+async function loadRooms(){
+try{const res=await fetch('/api/rooms',{headers:{Authorization:'Bearer '+token}});
+allRooms=await res.json();renderRooms(allRooms);}catch(e){console.error(e);}
+}
+
+function renderRooms(rooms){
+const container=document.getElementById('chats-panel');
+if(!rooms.length){container.innerHTML='<div class="empty-state">Bado huna mazungumzo.<br>Nenda "Watu" kuanza.</div>';return;}
+container.innerHTML=rooms.map(room=>{
+const name=room.is_group?room.name:(room.other_user?.username||'Mtu');
+const avatar=room.is_group?null:room.other_user?.avatar;
+const initials=name[0].toUpperCase();
+const isOnline=!room.is_group&&onlineUserIds.has(room.other_user?.id);
+const time=room.last_message_time?formatTime(room.last_message_time):'';
+const preview=room.last_message?truncate(room.last_message,35):'Bado hakuna ujumbe';
+return`<div class="room-item ${room.id===currentRoomId?'active':''}" onclick="openRoom('${room.id}')">
+<div class="room-avatar" style="background:${room.is_group?'linear-gradient(135deg,#7c3aed,#4f9cf9)':'linear-gradient(135deg,#4f9cf9,#22d3a5)'}">
+${avatar?`<img src="${avatar}">`:''}${!avatar?initials:''}
+${isOnline?'<div class="online-dot"></div>':''}
+</div>
+<div class="room-info"><div class="room-name">${escHtml(name)}</div><div class="room-preview">${escHtml(preview)}</div></div>
+<div class="room-meta"><div class="room-time">${time}</div></div>
+</div>`;
+}).join('');
+}
+
+function filterRooms(){
+const q=document.getElementById('search-input').value.toLowerCase();
+renderRooms(allRooms.filter(r=>(r.is_group?r.name:(r.other_user?.username||'')).toLowerCase().includes(q)));
+}
+
+async function openRoom(roomId){
+currentRoomId=roomId;
+const room=allRooms.find(r=>r.id===roomId);if(!room)return;
+const name=room.is_group?room.name:(room.other_user?.username||'Mtu');
+const avatar=room.is_group?null:room.other_user?.avatar;
+document.getElementById('chat-name').textContent=name;
+const avatarEl=document.getElementById('chat-avatar');
+avatarEl.innerHTML=avatar?`<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;">`:name[0].toUpperCase();
+if(room.is_group){document.getElementById('chat-status').textContent=`Kikundi · wanachama ${room.members?.length||'?'}`;document.getElementById('chat-status').className='';}
+else{const isOnline=onlineUserIds.has(room.other_user?.id);document.getElementById('chat-status').textContent=isOnline?'🟢 Mtandaoni':'Nje ya mtandao';document.getElementById('chat-status').className=isOnline?'online':'';}
+document.getElementById('chat-placeholder').style.display='none';
+const ac=document.getElementById('active-chat');ac.style.display='flex';ac.style.flexDirection='column';ac.style.flex='1';
+document.getElementById('chat-area').classList.add('mobile-open');
+renderRooms(allRooms);await loadMessages(roomId);
+socket.emit('mark_read',{room_id:roomId});
+document.getElementById('message-input').focus();
+}
+
+async function loadMessages(roomId){
+const container=document.getElementById('messages-container');
+container.innerHTML='<div class="typing-indicator" id="typing-indicator"><span id="typing-name"></span><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+try{const res=await fetch(`/api/rooms/${roomId}/messages`,{headers:{Authorization:'Bearer '+token}});
+const messages=await res.json();messages.forEach(m=>appendMessage(m));scrollToBottom();}catch(e){console.error(e);}
+}
+
+function appendMessage(msg){
+const container=document.getElementById('messages-container');
+const isOut=msg.sender_id===currentUser.id;
+const typingEl=document.getElementById('typing-indicator');
+const div=document.createElement('div');
+div.className=`message ${isOut?'outgoing':'incoming'}`;
+const initials=(msg.username||'?')[0].toUpperCase();
+const avatarHtml=msg.avatar?`<img src="${msg.avatar}">`:'';
+const avatarText=!msg.avatar?initials:'';
+const room=allRooms.find(r=>r.id===msg.room_id);
+const showSender=!isOut&&room?.is_group;
+let contentHtml=msg.type==='image'?`<img src="${escHtml(msg.content)}" class="msg-image" onclick="window.open(this.src)">`:`<div class="msg-text">${escHtml(msg.content)}</div>`;
+div.innerHTML=`<div class="msg-avatar">${avatarHtml}${avatarText}</div><div class="msg-bubble">${showSender?`<div class="msg-sender">${escHtml(msg.username)}</div>`:''}${contentHtml}<div class="msg-time">${formatTime(msg.created_at)}</div></div>`;
+container.insertBefore(div,typingEl);scrollToBottom();
+}
+
+function updateRoomPreview(msg){
+const room=allRooms.find(r=>r.id===msg.room_id);
+if(room){room.last_message=msg.type==='text'?msg.content:'📷 Picha';room.last_message_time=msg.created_at;allRooms.sort((a,b)=>(b.last_message_time||0)-(a.last_message_time||0));renderRooms(allRooms);}
+else loadRooms();
+}
+
+async function loadUsers(){
+try{const res=await fetch('/api/users',{headers:{Authorization:'Bearer '+token}});allUsers=await res.json();renderUsers();}catch{}
+}
+
+function renderUsers(){
+const container=document.getElementById('users-panel');
+if(!allUsers.length){container.innerHTML='<div class="empty-state">Hakuna watumiaji wengine bado.</div>';return;}
+container.innerHTML=allUsers.map(u=>{
+const isOnline=onlineUserIds.has(u.id);
+return`<div class="room-item" onclick="startDM('${u.id}')">
+<div class="room-avatar" style="background:linear-gradient(135deg,#4f9cf9,#22d3a5);position:relative;">
+${u.avatar?`<img src="${u.avatar}">`:''}${!u.avatar?u.username[0].toUpperCase():''}
+${isOnline?'<div class="online-dot"></div>':''}
+</div>
+<div class="room-info"><div class="room-name">${escHtml(u.username)}</div><div class="room-preview">${isOnline?'🟢 Mtandaoni':escHtml(u.status||'Habari!')}</div></div>
+</div>`;
+}).join('');
+}
+
+async function startDM(userId){
+try{const res=await fetch('/api/rooms/dm',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({user_id:userId})});
+const data=await res.json();await loadRooms();showTab('chats');openRoom(data.room_id);}catch{}
+}
+
+function showTab(tab){
+document.querySelectorAll('.sidebar-tab').forEach((t,i)=>t.classList.toggle('active',(i===0)===(tab==='chats')));
+document.getElementById('chats-panel').style.display=tab==='chats'?'block':'none';
+document.getElementById('users-panel').style.display=tab==='users'?'block':'none';
+if(tab==='users'){loadUsers();}
+}
+
+function handleKeyDown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+
+function handleTyping(){
+if(!currentRoomId)return;
+socket.emit('typing',{room_id:currentRoomId,is_typing:true});
+clearTimeout(typingTimeout);
+typingTimeout=setTimeout(()=>socket.emit('typing',{room_id:currentRoomId,is_typing:false}),1500);
+const ta=document.getElementById('message-input');ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';
+}
+
+function sendMessage(){
+const input=document.getElementById('message-input');
+const content=input.value.trim();
+if(!content||!currentRoomId)return;
+socket.emit('send_message',{room_id:currentRoomId,content,type:'text'});
+input.value='';input.style.height='auto';
+socket.emit('typing',{room_id:currentRoomId,is_typing:false});
+}
+
+async function sendImage(input){
+if(!input.files[0]||!currentRoomId)return;
+const formData=new FormData();formData.append('file',input.files[0]);
+try{const res=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:formData});
+const data=await res.json();socket.emit('send_message',{room_id:currentRoomId,content:data.url,type:'image'});}catch{}
+input.value='';
+}
+
+function openGroupModal(){
+loadUsers();
+setTimeout(()=>{
+document.getElementById('group-users-list').innerHTML=allUsers.map(u=>`<label class="checkbox-item"><input type="checkbox" value="${u.id}"><div class="room-avatar" style="width:32px;height:32px;font-size:0.8rem;background:linear-gradient(135deg,#4f9cf9,#22d3a5)">${u.username[0].toUpperCase()}</div><span>${escHtml(u.username)}</span></label>`).join('');
+},100);
+document.getElementById('group-modal').classList.add('visible');
+}
+
+function closeGroupModal(){document.getElementById('group-modal').classList.remove('visible');}
+
+async function createGroup(){
+const name=document.getElementById('group-name').value.trim();
+if(!name)return alert('Weka jina la kikundi');
+const checked=[...document.querySelectorAll('#group-users-list input:checked')].map(i=>i.value);
+try{const res=await fetch('/api/rooms/group',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({name,member_ids:checked})});
+const data=await res.json();closeGroupModal();document.getElementById('group-name').value='';await loadRooms();openRoom(data.room_id);}catch{}
+}
+
+function openProfileModal(){document.getElementById('status-input').value=currentUser.status||'';document.getElementById('profile-modal').classList.add('visible');}
+function closeProfileModal(){document.getElementById('profile-modal').classList.remove('visible');}
+
+async function saveProfile(){
+const status=document.getElementById('status-input').value.trim();
+try{await fetch('/api/profile',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({status})});
+currentUser.status=status;localStorage.setItem('user',JSON.stringify(currentUser));document.getElementById('my-status').textContent=status;closeProfileModal();}catch{}
+}
+
+function closeChat(){document.getElementById('chat-area').classList.remove('mobile-open');currentRoomId=null;}
+function scrollToBottom(){const c=document.getElementById('messages-container');c.scrollTop=c.scrollHeight;}
+
+function updateOnlineStatus(userId,isOnline){
+renderUsers();renderRooms(allRooms);
+const room=allRooms.find(r=>!r.is_group&&r.other_user?.id===userId);
+if(room&&room.id===currentRoomId){document.getElementById('chat-status').textContent=isOnline?'🟢 Mtandaoni':'Nje ya mtandao';document.getElementById('chat-status').className=isOnline?'online':'';}
+}
+
+function showNotification(title,msg){
+document.getElementById('notif-title').textContent=title;
+document.getElementById('notif-msg').textContent=msg;
+const n=document.getElementById('notification');n.classList.add('show');setTimeout(()=>n.classList.remove('show'),4000);
+}
+
+function formatTime(ts){
+const d=new Date(typeof ts==='number'&&ts<1e12?ts*1000:ts);
+const now=new Date();
+if(d.toDateString()===now.toDateString())return d.toLocaleTimeString('sw',{hour:'2-digit',minute:'2-digit'});
+return d.toLocaleDateString('sw',{day:'numeric',month:'short'});
+}
+
+function truncate(str,n){return str.length>n?str.slice(0,n)+'...':str;}
+function escHtml(str){if(!str)return'';return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+if(token&&currentUser)initApp();
+</script>
+</body>
+  </html>
